@@ -7,6 +7,5 @@ build/
 dist/
 *.spec.bak
 src/config/config.json
-src/config/apikey_data.bin
 .pytest_cache/
 .mypy_cache/
