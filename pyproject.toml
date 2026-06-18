@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "leuco-blog-manager"
+version = "0.18.0"
+description = "PyQt6 Hugo content manager for Leuco Blog"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "Proprietary"}
+authors = [{name = "Leuco Blog Manager"}]
+dependencies = [
+    "PyQt6>=6.6",
+    "PyYAML>=6.0",
+    "requests>=2.31",
+    "pycryptodome>=3.20",
+    "Pillow>=10.0",
+    "scour>=0.38",
+]
+
+[project.optional-dependencies]
+build = [
+    "pyinstaller>=6.0",
+]
+
+[project.scripts]
+leuco-blog-manager = "main:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+py-modules = ["core", "dialogs", "workers", "main"]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ui", "ui.*"]

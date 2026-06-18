@@ -1,0 +1,13 @@
+{
+  "blog_root": "D:/Blog/leuco blog",
+  "api_base_url": "https://api.deepseek.com",
+  "api_model": "deepseek-v4-flash",
+  "git_remote": "origin",
+  "git_branch": "main",
+  "git_rebase": true,
+  "git_autostash": true,
+  "blog_url": "https://leuco-yuu.github.io/",
+  "slug_concurrency": 20,
+  "slug_batch_size": 40,
+  "last_browse_dir": ""
+}

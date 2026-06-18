@@ -1,0 +1,7 @@
+PyQt6>=6.6
+PyYAML>=6.0
+requests>=2.31
+pycryptodome>=3.20
+Pillow>=10.0
+scour>=0.38
+pyinstaller>=6.0
