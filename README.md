@@ -32,6 +32,46 @@ python -m pip install -e .
 leuco-blog-manager
 ```
 
+## Kali / Linux 适配
+
+本项目已针对 Kali（及一般 Debian 系 Linux）做过深度适配，主要解决：
+
+- 深色桌面主题下文字与背景同为白色（白字白底）的问题：启动时强制使用 Fusion 样式 + 浅色调色板，并为表格、输入框、下拉框、菜单、滚动条、进度条等所有常用控件补充显式前景/背景色；
+- 中文显示为方块：Linux 下自动优先使用 Noto Sans CJK / 文泉驿等中文字体；
+- 配置文件位置：Linux 下优先使用 XDG 配置目录（`~/.config/leuco-blog-manager`），已有旧配置时自动沿用，避免丢失设置与密钥；
+- Hugo 端口检测：lsof 不可用时自动回退 `ss` / `fuser`，并通过 `/proc` 验证进程身份，避免误杀；
+- 打开文件/网页：QDesktopServices 失败时自动回退 `xdg-open`；
+- 缺少 git / hugo 时给出 Kali 的 apt 安装提示；
+- 一键安装脚本会补齐 PyQt6 运行所需的 XCB、GL、DBus、中文字体等系统依赖。
+
+在 Kali 上执行一键安装：
+
+```bash
+chmod +x scripts/install_kali.sh
+./scripts/install_kali.sh
+```
+
+安装完成后开发运行：
+
+```bash
+./scripts/run_kali.sh
+```
+
+也可以直接使用虚拟环境中的命令：
+
+```bash
+source .venv/bin/activate
+leuco-blog-manager
+```
+
+构建 Linux 单文件程序：
+
+```bash
+./scripts/build_linux.sh
+```
+
+产物位于 `dist/leuco-blog-manager`。安装脚本还会在应用菜单中注册 “Leuco Blog Manager” 桌面入口。
+
 ## 项目结构
 
 ```text
@@ -42,11 +82,16 @@ leuco_blog_manager_project/
 ├─ run.py
 ├─ run
 ├─ packaging/
-│  └─ LeucoBlogManager.spec
+│  ├─ LeucoBlogManager.spec
+│  ├─ LeucoBlogManager_linux.spec
+│  └─ leuco-blog-manager.desktop
 ├─ scripts/
 │  ├─ run_dev.bat
 │  ├─ run_dev.ps1
-│  └─ build_windows.ps1
+│  ├─ build_windows.ps1
+│  ├─ install_kali.sh
+│  ├─ run_kali.sh
+│  └─ build_linux.sh
 └─ src/
    ├─ __main__.py
    ├─ main.py

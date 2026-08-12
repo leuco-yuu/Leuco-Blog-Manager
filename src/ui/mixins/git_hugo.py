@@ -2,6 +2,26 @@ from core import *
 from dialogs import *
 from workers import *
 
+import re
+
+
+def _proc_cmdline(pid: int) -> str:
+    """读取 Linux /proc 中的进程命令行，避免依赖 ps/lsof。"""
+    try:
+        raw = Path(f"/proc/{pid}/cmdline").read_bytes()
+        return raw.replace(b"\x00", b" ").decode("utf-8", "replace").strip()
+    except Exception:
+        return ""
+
+
+def _proc_name_is_hugo(pid: int) -> bool:
+    """通过 /proc 验证指定 PID 是否属于 Hugo，避免误杀其他占用 1313 的服务。"""
+    try:
+        comm = Path(f"/proc/{pid}/comm").read_text(encoding="utf-8", errors="replace").strip()
+    except Exception:
+        comm = ""
+    return "hugo" in comm.casefold() or "hugo" in _proc_cmdline(pid).casefold()
+
 
 class GitHugoMixin:
     def pull_remote(self) -> None:
@@ -13,6 +33,16 @@ class GitHugoMixin:
             self.start_git(action, msg.strip() or "update blog")
 
     def start_git(self, action: str, message: str = "") -> None:
+        if shutil.which("git") is None:
+            hint = (
+                "未找到 git 命令。\n\nKali/Linux 可运行：\n"
+                "    sudo apt-get install -y git\n"
+                "或执行 scripts/install_kali.sh 完成全部环境配置。"
+                if is_linux()
+                else "请先安装 Git 后重试。"
+            )
+            QMessageBox.critical(self, "未找到 Git", hint)
+            return
         self._git_busy = True
         self.set_status("正在启动 Git 操作……")
         self.update_progress_visibility()
@@ -73,7 +103,7 @@ class GitHugoMixin:
 
     def open_hugo_browser_if_running(self) -> None:
         if hugo_preview_port_in_use():
-            QDesktopServices.openUrl(QUrl(f"http://{HUGO_PREVIEW_HOST}:{HUGO_PREVIEW_PORT}/"))
+            open_with_system(f"http://{HUGO_PREVIEW_HOST}:{HUGO_PREVIEW_PORT}/")
 
     def on_hugo_started(self) -> None:
         self._hugo_starting = False
@@ -159,20 +189,40 @@ class GitHugoMixin:
                         verified.add(pid)
                 return sorted(verified)
 
+            # Linux：依次尝试 lsof、ss、fuser，并用 /proc 验证进程身份。
+            raw_pids: set[int] = set()
             code, output = run_cmd_status(
                 ["lsof", "-nP", f"-iTCP:{HUGO_PREVIEW_PORT}", "-sTCP:LISTEN", "-t"],
                 timeout=10,
             )
-            if code != 0:
-                return []
-            for raw in output.split():
-                try:
-                    pid = int(raw)
-                except ValueError:
-                    continue
-                code, name = run_cmd_status(["ps", "-p", str(pid), "-o", "comm="], timeout=10)
-                if code == 0 and "hugo" in name.lower():
-                    pids.add(pid)
+            if code == 0 and output.strip():
+                raw_pids = {int(raw) for raw in output.split() if raw.strip().isdigit()}
+            else:
+                code, output = run_cmd_status(
+                    ["ss", "-ltnp", f"sport = :{HUGO_PREVIEW_PORT}"],
+                    timeout=10,
+                )
+                if code == 0:
+                    raw_pids = {int(match) for match in re.findall(r"pid=(\d+)", output)}
+                if not raw_pids:
+                    code, output = run_cmd_status(
+                        ["fuser", "-n", "tcp", str(HUGO_PREVIEW_PORT)],
+                        timeout=10,
+                    )
+                    if code == 0:
+                        raw_pids = {
+                            int(token.rstrip(":"))
+                            for token in output.split()
+                            if token.rstrip(":").isdigit()
+                        }
+            for pid in raw_pids:
+                if is_linux():
+                    if _proc_name_is_hugo(pid):
+                        pids.add(pid)
+                else:
+                    code, name = run_cmd_status(["ps", "-p", str(pid), "-o", "comm="], timeout=10)
+                    if code == 0 and "hugo" in name.lower():
+                        pids.add(pid)
         except Exception:
             return []
         return sorted(pids)
@@ -214,6 +264,16 @@ class GitHugoMixin:
         )
 
     def start_hugo_service(self) -> None:
+        if shutil.which("hugo") is None:
+            hint = (
+                "未找到 hugo 命令。\n\nKali/Linux 可运行：\n"
+                "    sudo apt-get install -y hugo\n"
+                "或执行 scripts/install_kali.sh 完成全部环境配置。"
+                if is_linux()
+                else "请先安装 Hugo 后重试。"
+            )
+            QMessageBox.critical(self, "未找到 Hugo", hint)
+            return
         if hugo_preview_port_in_use():
             self.update_hugo_button_state()
             self.set_status("1313 端口已被占用，未重复启动 Hugo。")
@@ -258,4 +318,6 @@ class GitHugoMixin:
         if self.hugo_process and self.hugo_process.state() != QProcess.ProcessState.NotRunning:
             self._hugo_stop_requested = True
             self.hugo_process.terminate()
+            if not self.hugo_process.waitForFinished(2500):
+                self.hugo_process.kill()
         event.accept()

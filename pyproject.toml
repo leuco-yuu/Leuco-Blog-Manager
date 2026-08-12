@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "leuco-blog-manager"
-version = "0.18.0"
+version = "0.19.0"
 description = "PyQt6 Hugo content manager for Leuco Blog"
 readme = "README.md"
 requires-python = ">=3.10"

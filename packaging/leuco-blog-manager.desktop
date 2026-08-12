@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Leuco Blog Manager
+Name[zh_CN]=Leuco 博客管理器
+GenericName=Hugo Content Manager
+GenericName[zh_CN]=Hugo 内容管理器
+Comment=PyQt6 based Hugo blog content manager
+Comment[zh_CN]=基于 PyQt6 的 Hugo 博客内容管理器
+Exec="__VENV_PYTHON__" "__PROJECT_ROOT__/run.py"
+Icon=leuco-blog-manager
+Terminal=false
+Categories=Development;Office;Utility;
+StartupNotify=false

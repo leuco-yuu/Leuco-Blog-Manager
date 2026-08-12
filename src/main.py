@@ -5,6 +5,8 @@ from ui.main_window import MainWindow
 def main() -> None:
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
+    configure_app_font(app)
+    configure_app_theme(app)
     app_icon = icon()
     if not app_icon.isNull():
         app.setWindowIcon(app_icon)

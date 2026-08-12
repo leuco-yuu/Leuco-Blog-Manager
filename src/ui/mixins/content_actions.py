@@ -54,7 +54,8 @@ class ContentActionsMixin:
         if not path.exists():
             QMessageBox.warning(self, "路径不存在", str(path))
             return
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(path.resolve())))
+        if not open_with_system(path.resolve()):
+            QMessageBox.warning(self, "打开失败", f"无法打开路径：\n{path}")
 
     def mark_modified(self, value: bool = True) -> None:
         self.modified = value
@@ -662,7 +663,7 @@ class ContentActionsMixin:
 
     def open_cover(self, rec: ContentRecord | TaxonomyRecord) -> None:
         if is_web_url(rec.cover):
-            QDesktopServices.openUrl(QUrl(rec.cover))
+            open_with_system(rec.cover)
             return
         base = rec.bundle_dir if isinstance(rec, ContentRecord) else rec.folder
         path = local_cover_path(rec.cover, self.cfg.root, base)

@@ -82,7 +82,6 @@ APP_NAME = "LeucoBlogManager"
 BLOG_SITE_URL = "https://leuco-yuu.github.io/"
 HUGO_PREVIEW_HOST = "127.0.0.1"
 HUGO_PREVIEW_PORT = 1313
-DEFAULT_BLOG_ROOT = Path(r"D:\Blog\leuco blog")
 PACKAGE_DIR = Path(__file__).resolve().parent
 PROGRAM_DIR = (
     Path(sys.executable).resolve().parent
@@ -94,7 +93,42 @@ BUNDLED_RESOURCE_DIR = (
     if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS")
     else PACKAGE_DIR
 )
-CONFIG_DIR = PROGRAM_DIR / "config"
+
+
+def default_blog_root() -> Path:
+    """返回当前平台合理的默认博客根目录，可用 LEUCO_BLOG_ROOT 环境变量覆盖。"""
+    env = os.environ.get("LEUCO_BLOG_ROOT", "").strip()
+    if env:
+        return Path(env)
+    if os.name == "nt":
+        return Path(r"D:\Blog\leuco blog")
+    return Path.home() / "Blog" / "leuco blog"
+
+
+def is_linux() -> bool:
+    """判断当前是否运行在 Linux 上（包括 Kali）。"""
+    return os.name == "posix" and sys.platform.startswith("linux")
+
+
+def platform_config_dir() -> Path:
+    """返回当前平台的配置目录。
+
+    - Windows：沿用程序目录下的 config，兼容旧版本。
+    - Linux/Kali：优先使用 XDG 配置目录；若仓库内已有旧配置，则继续沿用旧位置，
+      避免丢失已有设置与加密密钥。
+    """
+    if is_linux():
+        xdg_root = Path(os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config"))
+        xdg_dir = xdg_root / "leuco-blog-manager"
+        legacy = PROGRAM_DIR / "config"
+        if (legacy / "config.json").exists() or (legacy / "apikey_data.bin").exists():
+            return legacy
+        return xdg_dir
+    return PROGRAM_DIR / "config"
+
+
+DEFAULT_BLOG_ROOT = default_blog_root()
+CONFIG_DIR = platform_config_dir()
 CONFIG_PATH = CONFIG_DIR / "config.json"
 API_KEY_FILE = CONFIG_DIR / "apikey_data.bin"
 SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -292,14 +326,237 @@ def run_cmd_status(args: List[str], cwd: Optional[Path] = None, timeout: int = 1
 
 def icon() -> QIcon:
     search_dirs = unique([program_dir(), BUNDLED_RESOURCE_DIR, PACKAGE_DIR])
+    # Linux 上 PNG 兼容性最好（ICO 依赖 Qt 图像插件，SVG 依赖 qsvg 插件）。
+    names = ("icon.ico", "icon.svg", "icon.png") if os.name == "nt" else ("icon.png", "icon.svg", "icon.ico")
     for base in search_dirs:
-        for name in ("icon.ico", "icon.svg", "icon.png"):
+        for name in names:
             p = Path(base) / name
             if p.exists():
                 q = QIcon(str(p))
                 if not q.isNull():
                     return q
+    if is_linux():
+        themed = QIcon.fromTheme("applications-internet")
+        if not themed.isNull():
+            return themed
     return QIcon()
+
+
+def build_stylesheet() -> str:
+    """返回完整浅色 QSS。
+
+    原有样式只覆盖了少数控件，Kali 等深色桌面主题下未覆盖的控件会继承
+    白色前景色，与白色背景叠加形成“白字白底”。这里为所有常用控件显式指定
+    前景/背景/选区颜色，保证任何 Linux 桌面环境下都可读。
+    """
+    return """
+QMainWindow, QDialog { background: #f8fafc; }
+QWidget { color: #0f172a; }
+
+QLabel { background: transparent; color: #0f172a; }
+QLabel#Title { font-size: 18px; font-weight: 800; color: #0f172a; }
+QLabel#Subtitle { color: #64748b; }
+
+QFrame#Card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; }
+
+QGroupBox {
+    background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px;
+    margin-top: 10px; padding: 10px 8px 8px 8px;
+}
+QGroupBox::title {
+    subcontrol-origin: margin; left: 10px; padding: 0 4px;
+    color: #334155; font-weight: 700; background: transparent;
+}
+
+QLineEdit, QTextEdit, QPlainTextEdit, QSpinBox, QDoubleSpinBox,
+QDateEdit, QTimeEdit, QDateTimeEdit, QComboBox {
+    background: #ffffff; color: #0f172a;
+    border: 1px solid #dbe3ef; border-radius: 6px; padding: 4px 6px;
+    selection-background-color: #dbeafe; selection-color: #0f172a;
+}
+QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus,
+QSpinBox:focus, QDoubleSpinBox:focus, QDateEdit:focus,
+QTimeEdit:focus, QDateTimeEdit:focus, QComboBox:focus {
+    border-color: #2563eb;
+}
+QLineEdit:disabled, QTextEdit:disabled, QPlainTextEdit:disabled,
+QSpinBox:disabled, QDoubleSpinBox:disabled, QDateEdit:disabled,
+QTimeEdit:disabled, QDateTimeEdit:disabled, QComboBox:disabled {
+    background: #f1f5f9; color: #94a3b8;
+}
+QComboBox QAbstractItemView {
+    background: #ffffff; color: #0f172a; border: 1px solid #dbe3ef;
+    selection-background-color: #dbeafe; selection-color: #0f172a;
+}
+
+QTableWidget, QTreeWidget, QListWidget, QTableView, QTreeView, QListView {
+    background: #ffffff; color: #0f172a; alternate-background-color: #f8fafc;
+    border: 1px solid #dbe3ef; border-radius: 6px;
+    selection-background-color: #dbeafe; selection-color: #0f172a;
+}
+QTableCornerButton::section { background: #f1f5f9; border: 0; }
+QHeaderView::section {
+    background: #f1f5f9; color: #334155; border: 0;
+    border-bottom: 1px solid #dbe3ef; padding: 3px 5px; font-weight: 700;
+}
+QTableWidget::item:selected, QTreeWidget::item:selected, QListWidget::item:selected {
+    background: #dbeafe; color: #0f172a;
+}
+
+QTabWidget::pane { border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff; }
+QTabBar::tab {
+    padding: 4px 8px; margin-right: 3px; color: #475569;
+    border-top-left-radius: 8px; border-top-right-radius: 8px;
+}
+QTabBar::tab:selected { background: #ffffff; color: #1d4ed8; font-weight: 700; }
+QTabBar::tab:!selected { background: #e2e8f0; color: #475569; }
+QTabBar::tab:hover:!selected { background: #cbd5e1; color: #334155; }
+
+QPushButton {
+    background: #2563eb; color: #ffffff; border: 0;
+    border-radius: 6px; padding: 4px 7px; font-weight: 600;
+}
+QPushButton:hover { background: #1d4ed8; }
+QPushButton:pressed { background: #1e40af; }
+QPushButton:disabled { background: #93c5fd; color: #eff6ff; }
+QPushButton#CompactButton { padding: 3px 5px; }
+QToolButton {
+    background: transparent; color: #0f172a;
+    border: 1px solid #dbe3ef; border-radius: 6px; padding: 3px 6px;
+}
+QToolButton:hover { background: #eff6ff; }
+QToolButton:pressed { background: #dbeafe; }
+
+QCheckBox, QRadioButton { color: #0f172a; spacing: 6px; background: transparent; }
+
+QMenuBar { background: #f8fafc; color: #0f172a; }
+QMenuBar::item { padding: 4px 8px; background: transparent; }
+QMenuBar::item:selected { background: #e2e8f0; }
+QMenu {
+    background: #ffffff; color: #0f172a;
+    border: 1px solid #dbe3ef; border-radius: 8px; padding: 4px;
+}
+QMenu::item { padding: 4px 18px 4px 12px; border-radius: 4px; }
+QMenu::item:selected { background: #dbeafe; color: #1d4ed8; }
+QMenu::item:disabled { color: #94a3b8; }
+QMenu::separator { height: 1px; background: #e2e8f0; margin: 4px 8px; }
+
+QScrollBar:vertical { background: #f1f5f9; width: 12px; margin: 0; }
+QScrollBar::handle:vertical { background: #cbd5e1; min-height: 24px; border-radius: 6px; }
+QScrollBar::handle:vertical:hover { background: #94a3b8; }
+QScrollBar:horizontal { background: #f1f5f9; height: 12px; margin: 0; }
+QScrollBar::handle:horizontal { background: #cbd5e1; min-width: 24px; border-radius: 6px; }
+QScrollBar::handle:horizontal:hover { background: #94a3b8; }
+QScrollBar::add-line, QScrollBar::sub-line { width: 0; height: 0; }
+QScrollBar::add-page, QScrollBar::sub-page { background: transparent; }
+
+QProgressBar {
+    background: #e2e8f0; color: #0f172a; border: 1px solid #dbe3ef;
+    border-radius: 6px; text-align: center;
+}
+QProgressBar::chunk { background: #2563eb; border-radius: 5px; }
+
+QSplitter::handle { background: #e2e8f0; }
+QSplitter::handle:horizontal { width: 3px; }
+QSplitter::handle:vertical { height: 3px; }
+
+QToolTip {
+    background: #0f172a; color: #f8fafc;
+    border: 1px solid #334155; padding: 4px 6px;
+}
+QStatusBar { background: #f8fafc; color: #334155; }
+QMessageBox QLabel, QInputDialog QLabel { background: transparent; color: #0f172a; }
+"""
+
+
+def _families_font(families: List[str]) -> QFont:
+    font = QFont()
+    try:
+        font.setFamilies([family for family in families if family])
+    except AttributeError:
+        font.setFamily(families[0] if families else "")
+    return font
+
+
+def configure_app_font(app: QApplication) -> None:
+    """在 Linux 上优先使用带中日韩字形回退的字体，避免中文显示为方块。"""
+    if not is_linux():
+        return
+    families = [
+        "Noto Sans CJK SC",
+        "Noto Sans CJK JP",
+        "WenQuanYi Micro Hei",
+        "WenQuanYi Zen Hei",
+        "Droid Sans Fallback",
+        "AR PL UMing CN",
+        "DejaVu Sans",
+    ]
+    font = _families_font(families)
+    if font.pointSize() < 9:
+        font.setPointSize(10)
+    app.setFont(font)
+
+
+def apply_light_palette(app: QApplication) -> None:
+    """强制浅色调色板，避免 Kali 深色主题造成白字白底。"""
+    palette = app.palette()
+    palette.setColor(QPalette.ColorRole.Window, QColor("#f8fafc"))
+    palette.setColor(QPalette.ColorRole.WindowText, QColor("#0f172a"))
+    palette.setColor(QPalette.ColorRole.Base, QColor("#ffffff"))
+    palette.setColor(QPalette.ColorRole.AlternateBase, QColor("#f8fafc"))
+    palette.setColor(QPalette.ColorRole.Text, QColor("#0f172a"))
+    palette.setColor(QPalette.ColorRole.Button, QColor("#ffffff"))
+    palette.setColor(QPalette.ColorRole.ButtonText, QColor("#0f172a"))
+    palette.setColor(QPalette.ColorRole.Highlight, QColor("#2563eb"))
+    palette.setColor(QPalette.ColorRole.HighlightedText, QColor("#ffffff"))
+    palette.setColor(QPalette.ColorRole.ToolTipBase, QColor("#0f172a"))
+    palette.setColor(QPalette.ColorRole.ToolTipText, QColor("#f8fafc"))
+    palette.setColor(QPalette.ColorRole.PlaceholderText, QColor("#94a3b8"))
+    palette.setColor(QPalette.ColorRole.Link, QColor("#1d4ed8"))
+    palette.setColor(QPalette.ColorRole.LinkVisited, QColor("#6d28d9"))
+    for group in (
+        QPalette.ColorGroup.Disabled,
+        QPalette.ColorGroup.Inactive,
+        QPalette.ColorGroup.Active,
+    ):
+        palette.setColor(group, QPalette.ColorRole.Text, QColor("#0f172a"))
+        palette.setColor(group, QPalette.ColorRole.WindowText, QColor("#0f172a"))
+        palette.setColor(group, QPalette.ColorRole.ButtonText, QColor("#0f172a"))
+    app.setPalette(palette)
+
+
+def configure_app_theme(app: QApplication) -> None:
+    """Kali/Linux 深度适配：Fusion 样式 + 浅色调色板 + 完整 QSS。"""
+    if is_linux():
+        app.setStyle("Fusion")
+        apply_light_palette(app)
+    app.setStyleSheet(build_stylesheet())
+
+
+def open_with_system(target: str | Path) -> bool:
+    """打开本地路径或 URL；Linux 上 QDesktopServices 失败时回退到 xdg-open。"""
+    try:
+        if isinstance(target, Path):
+            url = QUrl.fromLocalFile(str(target.resolve()))
+        else:
+            url = QUrl(target)
+        if QDesktopServices.openUrl(url):
+            return True
+    except Exception:
+        pass
+    if is_linux():
+        opener = shutil.which("xdg-open")
+        if opener:
+            try:
+                subprocess.Popen(
+                    [opener, str(target)],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                return True
+            except OSError:
+                pass
+    return False
 
 
 def unique(values: Iterable[Any]) -> List[str]:

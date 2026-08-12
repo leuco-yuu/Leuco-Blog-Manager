@@ -266,26 +266,7 @@ class UiMixin:
         return frame
 
     def apply_style(self) -> None:
-        self.setStyleSheet("""
-            QMainWindow { background: #f8fafc; }
-            QLabel#Title { font-size: 18px; font-weight: 800; color: #0f172a; }
-            QLabel#Subtitle { color: #64748b; }
-            QFrame#Card { background: white; border: 1px solid #e2e8f0; border-radius: 10px; }
-            QTabWidget::pane { border: 1px solid #e2e8f0; border-radius: 8px; background: white; }
-            QTabBar::tab { padding: 4px 8px; margin-right: 3px; border-top-left-radius: 8px; border-top-right-radius: 8px; }
-            QTabBar::tab:selected { background: white; color: #1d4ed8; font-weight: 700; }
-            QTabBar::tab:!selected { background: #e2e8f0; color: #475569; }
-            QHeaderView::section { background: #f1f5f9; color: #334155; border: 0; border-bottom: 1px solid #dbe3ef; padding: 3px 5px; font-weight: 700; }
-            QTableWidget, QListWidget, QTreeWidget, QTextEdit, QPlainTextEdit, QLineEdit, QComboBox {
-                background: white; border: 1px solid #dbe3ef; border-radius: 6px; padding: 2px; selection-background-color: #dbeafe; selection-color: #0f172a;
-            }
-            QPushButton { background: #2563eb; color: white; border: 0; border-radius: 6px; padding: 4px 7px; font-weight: 600; }
-            QPushButton:hover { background: #1d4ed8; }
-            QPushButton#CompactButton { padding: 3px 5px; }
-            QMenu { background: white; border: 1px solid #dbe3ef; border-radius: 8px; }
-            QMenu::item { padding: 4px 18px 4px 12px; }
-            QMenu::item:selected { background: #dbeafe; color: #1d4ed8; }
-        """)
+        self.setStyleSheet(build_stylesheet())
 
     def update_progress_visibility(self) -> None:
         active = self._sync_busy_depth > 0 or self._git_busy or self._hugo_starting or self._bulk_busy

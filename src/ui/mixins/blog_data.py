@@ -81,7 +81,8 @@ class BlogDataMixin:
         except ValueError as exc:
             QMessageBox.warning(self, "博客地址无效", str(exc))
             return
-        QDesktopServices.openUrl(QUrl(url))
+        if not open_with_system(url):
+            QMessageBox.warning(self, "打开失败", f"无法打开博客地址：\n{url}")
 
     def save_slug_concurrency(self, value: int) -> None:
         value = max(1, min(100, int(value)))
